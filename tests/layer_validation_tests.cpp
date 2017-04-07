@@ -100,16 +100,20 @@ static const char bindStateFragShaderText[] =
     "   uFragColor = vec4(0,1,0,1);\n"
     "}\n";
 
-// Format search helper
+// Format search helpers
+bool ImageFormatIsSupported(VkPhysicalDevice phy, VkFormat format,
+                            VkImageUsageFlags usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                            VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL, VkImageType type = VK_IMAGE_TYPE_2D,
+                            VkImageCreateFlags flags = 0) {
+    VkImageFormatProperties props;
+    VkResult ret = vkGetPhysicalDeviceImageFormatProperties(phy, format, type, tiling, usage, flags, &props);
+    return (VK_SUCCESS == ret);
+}
+
 VkFormat FindSupportedDepthStencilFormat(VkPhysicalDevice phy) {
     VkFormat ds_formats[] = {VK_FORMAT_D16_UNORM_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT_S8_UINT};
     for (uint32_t i = 0; i < sizeof(ds_formats); i++) {
-        VkFormatProperties format_props;
-        vkGetPhysicalDeviceFormatProperties(phy, ds_formats[i], &format_props);
-
-        if (format_props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
-            return ds_formats[i];
-        }
+        if (ImageFormatIsSupported(phy, ds_formats[i], VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)) return ds_formats[i];
     }
     return (VkFormat)0;
 }
@@ -23050,6 +23054,85 @@ TEST_F(VkPositiveLayerTest, PSOPolygonModeValid) {
     m_errorMonitor->VerifyNotFound();
 
     vkDestroyPipelineLayout(test_device.device(), pipeline_layout, NULL);
+}
+
+TEST_F(VkPositiveLayerTest, ListImageFormatMemoryRequirements) {
+    TEST_DESCRIPTION("Query Image Format Memory sizes");
+    VkResult err;
+    ASSERT_NO_FATAL_FAILURE(Init());
+
+    m_errorMonitor->ExpectSuccess();
+
+    VkImage image;
+    VkMemoryRequirements img_mem_reqs;
+
+    // 2D texture, 1k texels
+    VkImageCreateInfo image_create_info = {};
+    image_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    image_create_info.pNext = NULL;
+    image_create_info.imageType = VK_IMAGE_TYPE_2D;
+    image_create_info.format = VK_FORMAT_R8G8B8A8_UNORM;
+    image_create_info.extent.width = 32;
+    image_create_info.extent.height = 32;
+    image_create_info.extent.depth = 1;
+    image_create_info.mipLevels = 1;
+    image_create_info.arrayLayers = 1;
+    image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    image_create_info.queueFamilyIndexCount = 0;
+    image_create_info.pQueueFamilyIndices = NULL;
+    image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    image_create_info.flags = 0;
+
+    VkFormat format;
+
+    printf("Image memory requirement for a 1K (32 x 32) image, all supported formats\n");
+    printf("Device = %s, Tiling = IMAGE_TILING_OPTIMAL\n\n", m_device->phy().properties().deviceName);
+    for (uint32_t i = 1; i <= (uint32_t)VK_FORMAT_END_RANGE; i++)
+    {
+        format = (VkFormat)i;
+        printf(" %40s: ", FormatName(format));
+
+        if (ImageFormatIsSupported(gpu(), format, VK_IMAGE_USAGE_TRANSFER_SRC_BIT))
+        {
+            image_create_info.format = format;
+            err = vkCreateImage(m_device->device(), &image_create_info, NULL, &image);
+            ASSERT_VK_SUCCESS(err);
+            vkGetImageMemoryRequirements(m_device->device(), image, &img_mem_reqs);
+            int memsize = (int)img_mem_reqs.size;
+            printf("  %2d bytes/texel, (%5d total), alignment = %1llu\n", memsize / 1024, memsize, img_mem_reqs.alignment);
+            vkDestroyImage(m_device->device(), image, NULL);
+        }
+        else {
+            printf(" Unsupported format\n");
+        }
+    }
+    image_create_info.tiling = VK_IMAGE_TILING_LINEAR;
+
+    printf("\n\nImage memory requirement for a 1K (32 x 32) image, all supported formats\n");
+    printf("Device = %s, Tiling = IMAGE_TILING_LINEAR\n\n", m_device->phy().properties().deviceName);
+    for (uint32_t i = 1; i <= (uint32_t)VK_FORMAT_END_RANGE; i++)
+    {
+        format = (VkFormat)i;
+        printf(" %40s: ", FormatName(format));
+
+        if (ImageFormatIsSupported(gpu(), format, VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_TILING_LINEAR))
+        {
+            image_create_info.format = format;
+            err = vkCreateImage(m_device->device(), &image_create_info, NULL, &image);
+            ASSERT_VK_SUCCESS(err);
+            vkGetImageMemoryRequirements(m_device->device(), image, &img_mem_reqs);
+            int memsize = (int)img_mem_reqs.size;
+            printf("  %2d bytes/texel, (%5d total), alignment = %1llu\n", memsize / 1024, memsize, img_mem_reqs.alignment);
+            vkDestroyImage(m_device->device(), image, NULL);
+        }
+        else {
+            printf(" Unsupported format\n");
+        }
+    }
+    m_errorMonitor->VerifyNotFound();
 }
 
 #if 0  // A few devices have issues with this test so disabling for now
