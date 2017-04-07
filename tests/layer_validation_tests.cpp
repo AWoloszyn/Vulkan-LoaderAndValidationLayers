@@ -107,7 +107,18 @@ bool ImageFormatIsSupported(VkPhysicalDevice phy, VkFormat format,
                             VkImageCreateFlags flags = 0) {
     VkImageFormatProperties props;
     VkResult ret = vkGetPhysicalDeviceImageFormatProperties(phy, format, type, tiling, usage, flags, &props);
-    return (VK_SUCCESS == ret);
+    if (VK_SUCCESS != ret) return false;
+
+    VkFormatProperties format_props;
+    vkGetPhysicalDeviceFormatProperties(phy, format, &format_props);
+    VkFormatFeatureFlags f_flags =
+        (VK_IMAGE_TILING_OPTIMAL == tiling) ? format_props.optimalTilingFeatures : format_props.linearTilingFeatures;
+
+    // TODO: only checking the most common src/dst usages. Could be expanded.
+    if ((usage & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) && !(f_flags & VK_FORMAT_FEATURE_TRANSFER_SRC_BIT_KHR)) return false;
+    if ((usage & VK_IMAGE_USAGE_TRANSFER_DST_BIT) && !(f_flags & VK_FORMAT_FEATURE_TRANSFER_DST_BIT_KHR)) return false;
+
+    return true;
 }
 
 VkFormat FindSupportedDepthStencilFormat(VkPhysicalDevice phy) {
