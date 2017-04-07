@@ -115,6 +115,7 @@ VK_LAYER_EXPORT VkExtent3D FormatCompressedTexelBlockExtent(VkFormat format);
 VK_LAYER_EXPORT size_t FormatSize(VkFormat format);
 VK_LAYER_EXPORT unsigned int FormatChannelCount(VkFormat format);
 VK_LAYER_EXPORT VkFormatCompatibilityClass FormatCompatibilityClass(VkFormat format);
+VK_LAYER_EXPORT const char* FormatName(VkFormat format);
 VK_LAYER_EXPORT VkDeviceSize SafeModulo(VkDeviceSize dividend, VkDeviceSize divisor);
 
 #ifdef __cplusplus
