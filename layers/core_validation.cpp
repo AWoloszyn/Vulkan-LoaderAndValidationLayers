@@ -3022,7 +3022,8 @@ static bool ValidateDrawState(layer_data *dev_data, GLOBAL_CB_NODE *cb_node, con
                 }
                 // Validate the draw-time state for this descriptor set
                 std::string err_str;
-                if (!descriptor_set->ValidateDrawState(set_binding_pair.second, state.dynamicOffsets[setIndex], &err_str)) {
+                if (!descriptor_set->ValidateDrawState(set_binding_pair.second, state.dynamicOffsets[setIndex], cb_node, function,
+                                                       &err_str)) {
                     auto set = descriptor_set->GetSet();
                     result |= log_msg(
                         dev_data->report_data, VK_DEBUG_REPORT_ERROR_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT,
